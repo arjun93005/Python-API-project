@@ -28,17 +28,17 @@ while True:
         time.sleep(2)
                             
 
-def find_post(id):
-    f = 0
-    for i in my_posts:
-        if i['id'] == id:
-            return i
-    return None
+# def find_post(id):
+#     f = 0
+#     for i in my_posts:
+#         if i['id'] == id:
+#             return i
+#     return None
 
-def find_index_post(id):
-    for i, p in enumerate(my_posts):
-        if p['id'] == id:
-            return i
+# def find_index_post(id):
+#     for i, p in enumerate(my_posts):
+#         if p['id'] == id:
+#             return i
 
 @app.get("/")
 def root():
@@ -59,28 +59,38 @@ def create_post(post: Post):
     return {"data": new_post}
 
 @app.get("/posts/{id}")
-def get_post(id: int, response: Response):
-    if find_post(id) is None:
+def get_post(id: int):
+    # def get_post(id: int, response: Response):
+    cursor.execute("SELECT * FROM posts WHERE id = %s", (str(id)),)
+    post = cursor.fetchone()
+    print(post)
+    # conn.commit()
+    if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id: {id} was not found")
         # response.status_code = status.HTTP_404_NOT_FOUND
         # return {"message": f"post with id: {id} was not found"}
 
-    return {"post": find_post(id)}
+    return {"post": post}
 
 @app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_post(id : int):
-    index  = my_posts.pop(find_index_post(id))
-    if index is None:
+    cursor.execute("DELETE FROM posts WHERE id = %s RETURNING *", (str(id),))
+    deleted_post = cursor.fetchone()
+    conn.commit()
+    if not deleted_post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id: {id} does not exist")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @app.put("/posts/{id}")
 def update_post(id: int, post: Post):
-    index = find_index_post(id)
-    if index is None:
+    cursor.execute("UPDATE posts SET title = %s , content = %s, published = %s WHERE id = %s RETURNING *",
+                   (post.title, post.content, post.published, str(id)))
+    updated_post = cursor.fetchone()
+    conn.commit()
+    if not updated_post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id: {id} does not exist")
     
-    post_dict = post.dict()
-    post_dict['id'] = id
-    my_posts[index] = post_dict
-    return {"data": my_posts[index]}
+    # post_dict = post.dict()
+    # post_dict['id'] = id
+    # my_posts[index] = post_dict
+    return {"data": updated_post}
