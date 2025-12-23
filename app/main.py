@@ -1,12 +1,16 @@
 from typing import Optional
-from fastapi import FastAPI, Response, status, HTTPException
-from fastapi import Body
+from fastapi import FastAPI, Response, status, HTTPException, Depends
 from pydantic import BaseModel
 import pydantic
-from random import randrange
+# from random import randrange
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
+from . import models
+from .database import engine, get_db
+from sqlalchemy.orm import Session
+
+models.base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
@@ -40,22 +44,28 @@ while True:
 #         if p['id'] == id:
 #             return i
 
-@app.get("/")
-def root():
-    return {"hello world"}
+# @app.get("/")
+# def root():
+#     return {"hello world"}
 
 @app.get("/posts")
-def read_root():
-    cursor.execute("SELECT * FROM posts")
-    posts = cursor.fetchall()
-    conn.commit()
+def read_root(db : Session = Depends(get_db)):
+    # cursor.execute("SELECT * FROM posts")
+    # posts = cursor.fetchall()
+    # conn.commit()
+    posts = db.query(models.Post).all()
     return {"data": posts}
 
 @app.post("/posts", status_code=status.HTTP_201_CREATED)
-def create_post(post: Post):
-    cursor.execute("INSERT INTO posts (title, content) values (%s, %s) RETURNING *", (post.title, post.content))
-    new_post = cursor.fetchone()
-    conn.commit()
+def create_post(post : Post, db : Session = Depends(get_db)):
+    # cursor.execute("INSERT INTO posts (title, content) values (%s, %s) RETURNING *", (post.title, post.content))
+    # new_post = cursor.fetchone()
+    # conn.commit()
+
+    new_post = models.Post(**post.dict())
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post)
     return {"data": new_post}
 
 @app.get("/posts/{id}")
